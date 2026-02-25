@@ -12,9 +12,11 @@ import TodoPanel from './components/TodoPanel';
 import SyncModal from './components/SyncModal';
 import EditLinkModal from './components/EditLinkModal';
 import SettingsPanel from './components/SettingsPanel';
+import CommandPalette from './components/CommandPalette';
 import { useToast } from './components/Toast';
 import { enhanceLinkInfo } from './services/geminiService';
 import { formatUrl } from './utils/url';
+import { exportToJSON, importFromJSON } from './utils/dataIO';
 import {
   saveLinks, loadLinks,
   saveTodos, loadTodos,
@@ -41,7 +43,9 @@ const App: React.FC = () => {
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [editingLink, setEditingLink] = useState<LinkItem | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Sync State
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('offline');
@@ -202,6 +206,36 @@ const App: React.FC = () => {
   const handleToggleTodo = (id: string) => { setTodos(prev => prev.map(t => t.id === id ? { ...t, completed: !t.completed } : t)); };
   const handleDeleteTodo = (id: string) => { setTodos(prev => prev.filter(t => t.id !== id)); };
 
+  // Command Palette actions
+  const handlePaletteAction = useCallback((action: string) => {
+    switch (action) {
+      case 'toggle-palette': setIsPaletteOpen(p => !p); break;
+      case 'add-link': setIsAddingLink(true); break;
+      case 'toggle-theme': setTheme(t => t === 'dark' ? 'light' : 'dark'); break;
+      case 'toggle-layout': setLayout(l => l === 'grid' ? 'list' : 'grid'); break;
+      case 'open-sync': setIsSyncModalOpen(true); break;
+      case 'open-todo': setIsTodoOpen(true); break;
+      case 'open-settings': setIsSettingsOpen(true); break;
+      case 'export': exportToJSON(links, todos, categories); showToast('Exported to JSON', 'success'); break;
+      case 'import': fileInputRef.current?.click(); break;
+    }
+  }, [links, todos, categories, showToast]);
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const data = await importFromJSON(file);
+      setLinks(data.links);
+      setTodos(data.todos || []);
+      setCategories(data.categories || categories);
+      showToast(`Imported ${data.links.length} links`, 'success');
+    } catch (err) {
+      showToast('Import failed: invalid file', 'error');
+    }
+    e.target.value = '';
+  };
+
   const activeTodoCount = todos.filter(t => !t.completed).length;
   const getSyncLabel = () => {
     switch (syncStatus) {
@@ -229,9 +263,9 @@ const App: React.FC = () => {
         <div className="flex items-center space-x-2 md:space-x-3">
           <button onClick={() => setIsSyncModalOpen(true)}
             className={`flex items-center px-3 py-1.5 rounded-full border text-[11px] font-bold transition-all ${syncStatus === 'synced' ? 'bg-orange-50 dark:bg-orange-500/10 border-orange-100 dark:border-orange-500/30 text-orange-600' :
-                syncStatus === 'syncing' ? 'bg-amber-50 dark:bg-amber-500/10 border-amber-100 dark:border-amber-500/30 text-amber-600' :
-                  syncStatus === 'error' ? 'bg-red-50 dark:bg-red-500/10 border-red-100 dark:border-red-500/30 text-red-600' :
-                    'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500'
+              syncStatus === 'syncing' ? 'bg-amber-50 dark:bg-amber-500/10 border-amber-100 dark:border-amber-500/30 text-amber-600' :
+                syncStatus === 'error' ? 'bg-red-50 dark:bg-red-500/10 border-red-100 dark:border-red-500/30 text-red-600' :
+                  'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500'
               }`}
           >
             {syncStatus === 'synced' ? <Flame size={14} className="mr-1.5" /> :
@@ -333,6 +367,8 @@ const App: React.FC = () => {
       <SyncModal isOpen={isSyncModalOpen} onClose={() => setIsSyncModalOpen(false)} syncStatus={syncStatus} isFirebaseReady={isFirebaseReady} onMigrate={handleMigrate} onRestore={handleRestore} />
       <EditLinkModal isOpen={!!editingLink} link={editingLink} categories={categories} onClose={() => setEditingLink(null)} onSave={handleEditLink} />
       <SettingsPanel isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} theme={theme} onThemeChange={setTheme} />
+      <CommandPalette isOpen={isPaletteOpen} onClose={() => setIsPaletteOpen(false)} links={links} categories={categories} onSelectLink={(url) => window.open(formatUrl(url), '_blank')} onSelectCategory={(id) => { setSelectedCategoryId(id); }} onAction={handlePaletteAction} />
+      <input ref={fileInputRef} type="file" accept=".json" className="hidden" onChange={handleImportFile} />
 
       {/* Add Link Modal */}
       {isAddingLink && (
