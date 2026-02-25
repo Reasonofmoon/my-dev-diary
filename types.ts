@@ -5,6 +5,9 @@ export interface LinkItem {
   url: string;
   description: string;
   categoryId: string;
+  isPinned: boolean;
+  favicon?: string;
+  ogImage?: string;
   createdAt: number;
 }
 
@@ -23,5 +26,10 @@ export interface TodoItem {
 }
 
 export type SyncStatus = 'synced' | 'syncing' | 'offline' | 'error';
-
 export type LayoutType = 'grid' | 'list';
+export type ThemeMode = 'light' | 'dark' | 'system';
+
+export interface AppSettings {
+  theme: ThemeMode;
+  layout: LayoutType;
+}
